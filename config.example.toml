@@ -1,0 +1,45 @@
+# Copy to ~/.config/memo-ingest/config.toml, or run `memo-ingest setup`.
+# No secrets. Audio is transcribed on this machine.
+
+[paths]
+recordings_dir = "/Users/you/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings"
+vault_root = "/Users/you/vaults/your-vault"
+# Empty means {vault_root}/inbox/transcripts
+inbox_dir = ""
+# Empty means {vault_root}/attachments/audio
+audio_dir = ""
+# Empty means ~/.local/share/memo-ingest/state.sqlite
+state_db = ""
+# Empty means ~/Library/Logs/memo-ingest.log
+log_file = ""
+
+[watch]
+# launchd runs `memo-ingest once` on this interval. Re-run setup after changing it.
+poll_interval_sec = 45
+# A file must keep the same size and mtime for this long before it is transcribed.
+# The first time a file is seen it is never ready, even if this value has already elapsed.
+stable_seconds = 12
+min_bytes = 10240
+# Copy the .m4a into the vault. The Voice Memos original is never deleted.
+copy_audio = true
+
+[whisper]
+# auto | mlx-whisper | whisper.cpp
+# auto on Apple Silicon uses mlx-whisper. There is no cloud fallback.
+backend = "auto"
+model = "mlx-community/whisper-large-v3-turbo"
+# auto, or a language code such as en
+language = "auto"
+# Speaker diarization is not implemented. The flag is reserved.
+diarize = false
+whisper_cpp_bin = "whisper-cli"
+whisper_cpp_model = ""
+
+[summarize]
+# Separate from speech-to-text. Leave false until you set a local command.
+enabled = false
+# Shell command. The prompt file plus the transcript are written to stdin.
+# Stdout must contain the headings "## Summary" and "## Action items".
+command = ""
+# Empty means prompts/summarize.md in this repo.
+prompt_file = ""

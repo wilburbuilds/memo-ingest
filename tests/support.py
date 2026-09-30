@@ -2,7 +2,7 @@ import tempfile
 from pathlib import Path
 
 from memo_ingest.config import DEFAULT_MODEL, Config
-from memo_ingest.transcribe import Transcript
+from memo_ingest.transcribe import Segment, Transcript
 
 
 def make_config(root: Path | None = None) -> tuple[Path, Config]:
@@ -14,6 +14,8 @@ def make_config(root: Path | None = None) -> tuple[Path, Config]:
     prompt = tmp / "prompts" / "summarize.md"
     prompt.parent.mkdir()
     prompt.write_text("Summarize the transcript.\n", encoding="utf-8")
+    name_prompt = tmp / "prompts" / "name-speakers.md"
+    name_prompt.write_text("Name the speakers.\n", encoding="utf-8")
     cfg = Config(
         recordings_dir=recordings,
         vault_root=vault,
@@ -31,9 +33,16 @@ def make_config(root: Path | None = None) -> tuple[Path, Config]:
         diarize=False,
         whisper_cpp_bin="whisper-cli",
         whisper_cpp_model="",
+        diarize_models_dir="",
+        diarize_threshold=0.5,
+        diarize_max_speakers=0,
+        diarize_fail_soft=True,
         summarize_enabled=False,
         summarize_command="",
         prompt_file=prompt,
+        name_speakers_enabled=False,
+        name_speakers_command="",
+        name_speakers_prompt_file=tmp / "prompts" / "name-speakers.md",
         config_path=None,
     )
     return tmp, cfg
@@ -51,7 +60,7 @@ class FakeTranscriber:
         self.paths.append(path)
         return Transcript(
             text=self.text,
-            segments=[(0.0, 1.25, self.text)],
+            segments=[Segment(start=0.0, end=1.25, text=self.text)],
             language="en",
             model_name=self.model_name,
             runtime_sec=0.05,

@@ -27,9 +27,12 @@ What works:
 
 What is not done:
 
-- Summary and action items stay empty. `status` stays `raw`.
-- No speaker names.
 - No chat app over the vault.
+
+Optional next steps (implemented, off by default):
+
+- Local speaker diarization (`whisper.diarize` + `.[diarize]` + `ensure-diarize-models`).
+- Grok Build speaker naming (`memo-ingest name-speakers`) so summarize sees real names.
 
 `AGENTS.md` is the longer note for whoever changes this next: paths on this Mac, Full Disk Access, and the invariants that are easy to break.
 
@@ -61,6 +64,8 @@ memo-ingest setup --recordings ~/VoiceMemosExport --force
 cd ~/memo-ingest
 python3 -m venv .venv
 .venv/bin/pip install -e ".[mlx]"
+# optional local diarization:
+# .venv/bin/pip install -e ".[diarize]" && .venv/bin/memo-ingest ensure-diarize-models
 .venv/bin/memo-ingest setup
 ```
 
@@ -136,7 +141,50 @@ whisper_cpp_bin = "whisper-cli"
 whisper_cpp_model = "/absolute/path/ggml-large-v3-turbo.bin"
 ```
 
-Speaker diarization (`diarize`) is accepted in config and does nothing in v1.
+### Speaker diarization (optional, local)
+
+Runs **after** Whisper on this Mac via `sherpa-onnx`. Does not replace STT. Does not upload audio.
+
+```bash
+cd ~/memo-ingest
+.venv/bin/pip install -e ".[diarize]"
+.venv/bin/memo-ingest ensure-diarize-models
+```
+
+Then in `~/.config/memo-ingest/config.toml`:
+
+```toml
+[whisper]
+diarize = true
+
+[diarize]
+# empty => ~/.cache/memo-ingest/diarize
+models_dir = ""
+threshold = 0.5
+max_speakers = 0      # 0 = unknown
+fail_soft = true      # continue without speakers if models missing
+```
+
+Transcript lines become `[mm:ss] SPEAKER_00: text`. Frontmatter sets `speakers: true` and `speaker_count`.
+
+### Speaker naming (optional, Grok Build)
+
+Maps `SPEAKER_XX` → names from transcript context (text only). **Rewrites labels in the transcript body** and stores `speaker_names` in frontmatter so a later summarize pass sees real names. Spoken words are not changed.
+
+```toml
+[name_speakers]
+enabled = true
+command = "/Users/wilbur-macmini/memo-ingest/scripts/grok-name-speakers.sh"
+prompt_file = "/Users/wilbur-macmini/memo-ingest/prompts/name-speakers.md"
+```
+
+```bash
+~/memo-ingest/.venv/bin/memo-ingest name-speakers
+# or one note:
+~/memo-ingest/.venv/bin/memo-ingest name-speakers --note ~/vaults/brain-personal/inbox/transcripts/….md
+```
+
+When enabled, ingest runs naming after the note write and before summarize. Existing notes are not rewritten unless you run `name-speakers` or `reprocess`.
 
 ## Reprocess one file
 

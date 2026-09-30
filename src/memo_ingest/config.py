@@ -32,6 +32,14 @@ def default_prompt_file() -> Path:
     return repo_root() / "prompts" / "summarize.md"
 
 
+def default_name_speakers_prompt_file() -> Path:
+    return repo_root() / "prompts" / "name-speakers.md"
+
+
+def default_diarize_models_dir() -> Path:
+    return Path.home() / ".cache" / "memo-ingest" / "diarize"
+
+
 @dataclass(frozen=True)
 class Config:
     recordings_dir: Path
@@ -50,9 +58,16 @@ class Config:
     diarize: bool
     whisper_cpp_bin: str
     whisper_cpp_model: str
+    diarize_models_dir: str
+    diarize_threshold: float
+    diarize_max_speakers: int
+    diarize_fail_soft: bool
     summarize_enabled: bool
     summarize_command: str
     prompt_file: Path
+    name_speakers_enabled: bool
+    name_speakers_command: str
+    name_speakers_prompt_file: Path
     config_path: Path | None = None
 
     @property
@@ -78,11 +93,15 @@ def load_config(path: Path | None = None) -> Config:
     paths = data.get("paths") or {}
     watch = data.get("watch") or {}
     whisper = data.get("whisper") or {}
+    diarize_table = data.get("diarize") or {}
     summarize = data.get("summarize") or {}
+    name_speakers = data.get("name_speakers") or {}
     if not isinstance(paths, dict) or not isinstance(watch, dict):
         raise IngestError(f"{path}: expected [paths] and [watch] tables")
     if not isinstance(whisper, dict) or not isinstance(summarize, dict):
         raise IngestError(f"{path}: expected [whisper] and [summarize] tables")
+    if not isinstance(diarize_table, dict) or not isinstance(name_speakers, dict):
+        raise IngestError(f"{path}: expected [diarize] and [name_speakers] tables when present")
 
     vault_raw = paths.get("vault_root")
     recordings_raw = paths.get("recordings_dir")
@@ -123,15 +142,30 @@ def load_config(path: Path | None = None) -> Config:
         backend=backend,
         model=str(whisper.get("model", DEFAULT_MODEL)).strip() or DEFAULT_MODEL,
         language=str(whisper.get("language", "auto")).strip() or "auto",
-        diarize=bool(whisper.get("diarize", False)),
+        diarize=bool(whisper.get("diarize", diarize_table.get("enabled", False))),
         whisper_cpp_bin=str(whisper.get("whisper_cpp_bin", "whisper-cli")).strip()
         or "whisper-cli",
         whisper_cpp_model=str(whisper.get("whisper_cpp_model", "")).strip(),
+        diarize_models_dir=str(
+            diarize_table.get("models_dir", "") or ""
+        ).strip(),
+        diarize_threshold=float(diarize_table.get("threshold", 0.5)),
+        diarize_max_speakers=int(diarize_table.get("max_speakers", 0)),
+        diarize_fail_soft=bool(diarize_table.get("fail_soft", True)),
         summarize_enabled=bool(summarize.get("enabled", False)),
         summarize_command=str(summarize.get("command", "")).strip(),
         prompt_file=_as_path(summarize.get("prompt_file"), default_prompt_file()),
+        name_speakers_enabled=bool(name_speakers.get("enabled", False)),
+        name_speakers_command=str(name_speakers.get("command", "")).strip(),
+        name_speakers_prompt_file=_as_path(
+            name_speakers.get("prompt_file"), default_name_speakers_prompt_file()
+        ),
         config_path=path,
     )
+    if cfg.diarize_threshold <= 0:
+        raise IngestError("diarize.threshold must be > 0")
+    if cfg.diarize_max_speakers < 0:
+        raise IngestError("diarize.max_speakers must be >= 0 (0 means unknown)")
     _check_layout(cfg)
     return cfg
 
@@ -176,10 +210,23 @@ diarize = {_toml_bool(cfg.diarize)}
 whisper_cpp_bin = {_toml_str(cfg.whisper_cpp_bin)}
 whisper_cpp_model = {_toml_str(cfg.whisper_cpp_model)}
 
+[diarize]
+# Local sherpa-onnx after Whisper. Models under models_dir (default ~/.cache/memo-ingest/diarize).
+models_dir = {_toml_str(cfg.diarize_models_dir)}
+threshold = {cfg.diarize_threshold:g}
+max_speakers = {cfg.diarize_max_speakers}
+fail_soft = {_toml_bool(cfg.diarize_fail_soft)}
+
 [summarize]
 enabled = {_toml_bool(cfg.summarize_enabled)}
 command = {_toml_str(cfg.summarize_command)}
 prompt_file = {_toml_str(prompt)}
+
+[name_speakers]
+# Optional Grok Build pass: rewrite SPEAKER_XX → names (text only; no audio upload).
+enabled = {_toml_bool(cfg.name_speakers_enabled)}
+command = {_toml_str(cfg.name_speakers_command)}
+prompt_file = {_toml_str(cfg.name_speakers_prompt_file)}
 """
     path.write_text(text, encoding="utf-8")
 

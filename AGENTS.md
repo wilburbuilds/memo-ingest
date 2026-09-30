@@ -1,6 +1,6 @@
 # Notes for a future agent
 
-Read this before changing memo-ingest. The human-facing setup guide is `README.md`. This file is the operational picture as of 2026-09-30.
+Read this before changing memo-ingest. The human-facing setup guide is `README.md`. This file is the operational picture as of 2026-09-30 (diarize + name-speakers added).
 
 ## What this product is
 
@@ -41,15 +41,17 @@ A Homebrew Python upgrade changes the Cellar path. Full Disk Access must be gran
 - Write the note, then mark processed. If the note write fails, do not mark it. If the process dies after the write and before the mark, the next run finds `audio_sha256` in the inbox and adopts that note instead of writing a second one.
 - `reprocess` records the old note in `ignore_notes`, forgets the hash, and writes a new note. The old transcript stays put. Deleting only the note does not cause a re-transcription.
 - Copy audio into the vault. Do not hardlink it out of Voice Memos, and do not delete the original.
-- Summarize is a separate command (`memo-ingest summarize`) and is off. It may replace `## Summary` and `## Action items` and set `status: processed`. It must not change the transcript section. Prompt: `prompts/summarize.md`.
-- `diarize` is config-only. v1 does not diarize.
+- Summarize is a separate command (`memo-ingest summarize`). It may replace `## Summary` and `## Action items` and set `status: processed`. It must not change the transcript section. Prompt: `prompts/summarize.md`.
+- Diarization is optional local sherpa-onnx **after** mlx-whisper (`whisper.diarize`). Labels are `SPEAKER_00` etc. Models live in `~/.cache/memo-ingest/diarize/` (GitHub releases: pyannote-seg onnx + wespeaker EN). No pyannote HF gated path. Audio is never uploaded for diarization. `diarize.fail_soft` (default true) continues without speakers if models/sherpa are missing.
+- Speaker naming is a separate optional Grok Build pass (`memo-ingest name-speakers`, `scripts/grok-name-speakers.sh`, `prompts/name-speakers.md`). It rewrites `SPEAKER_XX` labels in the transcript body to inferred names and stores `speaker_names` in frontmatter so summarize sees real names. Text only; no audio upload. May run automatically after note write when `[name_speakers] enabled = true`, before summarize.
+- Do not rewrite existing vault notes for diarization/naming unless the user runs `reprocess` (new note) or `name-speakers` on a diarized note.
 - `clean_title` rejects Voice Memos auto stems (compact/dashed wall time plus an optional hex id), so the note heading falls back to `Voice memo {YYYY-MM-DD HH:MM}` and the basename uses `voice-memo`. Real human titles still pass through. Five older inbox notes still have the raw filename headings; do not rewrite their transcript bodies. Renaming them is a separate, explicit edit.
 - Tests: `python -m unittest discover -s tests -t .` from the repo, using the venv. `tests/test_live.py` runs real mlx-whisper and needs the model cache plus `say` and `ffmpeg`.
 
 ## Shortcomings
 
-- Summary and action items are empty. `status` stays `raw`.
-- No speaker diarization.
+- Summary and action items stay empty until summarize runs. `status` stays `raw` until then.
+- Diarization/naming are implemented but off until `whisper.diarize` / `[name_speakers] enabled` and models/command are set.
 - No chat UI. Query the notes from Obsidian or another tool pointed at the vault.
 - Whisper on a short or noisy memo can be imperfect. Leave the transcript as heard.
 - `memo-ingest status` from Terminal can report the recordings folder as unreadable even while the agent is healthy.

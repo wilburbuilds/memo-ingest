@@ -63,13 +63,24 @@ def format_timestamp(seconds: float) -> str:
     return f"{minutes:02d}:{secs:02d}"
 
 
-def render_transcript(text: str, segments: list[tuple[float, float, str]]) -> str:
+def render_transcript(text: str, segments: list) -> str:
+    """Render timed lines. When a segment has speaker_id, use `[mm:ss] SPEAKER_00: text`."""
     lines: list[str] = []
-    for start, _end, segment_text in segments:
-        cleaned = " ".join(segment_text.split())
+    for item in segments:
+        if hasattr(item, "start"):
+            start = float(item.start)
+            segment_text = str(item.text)
+            speaker_id = getattr(item, "speaker_id", None)
+        else:
+            start, _end, segment_text = item[0], item[1], item[2]
+            speaker_id = item[3] if len(item) > 3 else None
+        cleaned = " ".join(str(segment_text).split())
         if not cleaned:
             continue
-        lines.append(f"[{format_timestamp(start)}] {cleaned}")
+        if speaker_id:
+            lines.append(f"[{format_timestamp(start)}] {speaker_id}: {cleaned}")
+        else:
+            lines.append(f"[{format_timestamp(start)}] {cleaned}")
     if lines:
         return "\n\n".join(lines)
     return " ".join(text.split())
@@ -88,6 +99,9 @@ def render_note(
     runtime_sec: float,
     title: str | None,
     transcript_body: str,
+    speakers: bool = False,
+    speaker_count: int = 0,
+    speaker_names: dict[str, str] | None = None,
 ) -> str:
     heading = title if title else f"Voice memo {recorded.strftime('%Y-%m-%d %H:%M')}"
     language_value = language if re.fullmatch(r"[A-Za-z0-9_-]+", language or "") else "unknown"
@@ -105,26 +119,36 @@ def render_note(
         f"model: {model}",
         f"language: {language_value}",
         f"runtime_sec: {runtime_sec:.2f}",
-        "speakers: false",
-        "status: raw",
-        "---",
-        f"# {heading}",
-        "",
-        "## Transcript",
-        "",
-        body,
-        "",
-        "## Summary",
-        "",
-        "<!-- filled by optional second pass; leave heading in place -->",
-        "",
-        "## Action items",
-        "",
-        "- [ ]",
-        "",
+        f"speakers: {'true' if speakers else 'false'}",
     ]
+    if speakers:
+        lines.append(f"speaker_count: {max(0, int(speaker_count))}")
+    if speaker_names:
+        lines.append(
+            "speaker_names: "
+            + json.dumps(speaker_names, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+        )
+    lines.extend(
+        [
+            "status: raw",
+            "---",
+            f"# {heading}",
+            "",
+            "## Transcript",
+            "",
+            body,
+            "",
+            "## Summary",
+            "",
+            "<!-- filled by optional second pass; leave heading in place -->",
+            "",
+            "## Action items",
+            "",
+            "- [ ]",
+            "",
+        ]
+    )
     return "\n".join(lines)
-
 
 def write_note(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -234,3 +258,61 @@ def splice_summary(note_text: str, summary_md: str) -> str:
     # starts it, so the transcript section is unchanged.
     head = replace_status(note_text[:position], "processed")
     return head + "\n" + replacement
+
+
+def replace_frontmatter_fields(text: str, fields: dict[str, str]) -> str:
+    """Set or insert frontmatter keys. Existing keys are replaced in place."""
+    if not text.startswith("---\n"):
+        raise IngestError("note is missing frontmatter")
+    end = text.find("\n---\n", 4)
+    if end < 0:
+        raise IngestError("note frontmatter is not closed")
+    lines = text[4:end].splitlines()
+    remaining = dict(fields)
+    out: list[str] = []
+    for line in lines:
+        key = line.split(":", 1)[0].strip() if ":" in line else ""
+        if key in remaining:
+            out.append(f"{key}: {remaining.pop(key)}")
+        else:
+            out.append(line)
+    # Insert any new keys before status when present, else append.
+    if remaining:
+        status_idx = next((i for i, line in enumerate(out) if line.startswith("status:")), len(out))
+        for key, value in remaining.items():
+            out.insert(status_idx, f"{key}: {value}")
+            status_idx += 1
+    return "---\n" + "\n".join(out) + text[end:]
+
+
+def rewrite_speaker_labels(note_text: str, mapping: dict[str, str]) -> str:
+    """Replace SPEAKER_XX labels in the transcript body only. Spoken words stay put.
+
+    Coherent approach: rewrite labels in the body so summarize sees real names, and
+    callers also store speaker_names in frontmatter via replace_frontmatter_fields.
+    """
+    start = note_text.find("\n## Transcript\n")
+    end = note_text.find("\n## Summary\n")
+    if start < 0 or end < 0 or end <= start:
+        raise IngestError("note is missing ## Transcript or ## Summary")
+    body = note_text[start:end]
+
+    def repl(match: re.Match[str]) -> str:
+        label = match.group(0)
+        return mapping.get(label, label)
+
+    # Only replace SPEAKER_XX tokens (word boundaries), typically before a colon.
+    new_body = re.sub(r"\bSPEAKER_\d+\b", repl, body)
+    return note_text[:start] + new_body + note_text[end:]
+
+
+def speaker_ids_in_segments(segments: list) -> list[str]:
+    found: list[str] = []
+    seen: set[str] = set()
+    for item in segments:
+        speaker_id = getattr(item, "speaker_id", None)
+        if not speaker_id or speaker_id in seen:
+            continue
+        seen.add(speaker_id)
+        found.append(speaker_id)
+    return found

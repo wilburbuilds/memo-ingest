@@ -14,6 +14,8 @@ from memo_ingest.config import Config
 from memo_ingest.discover import directory_error, unreadable_recordings_message
 from memo_ingest.errors import IngestError
 from memo_ingest.gate import consider, is_audio_candidate
+from memo_ingest.diarize import maybe_diarize
+from memo_ingest.name_speakers import name_speakers_note
 from memo_ingest.note import (
     audio_wikilink,
     find_note_by_hash,
@@ -22,6 +24,7 @@ from memo_ingest.note import (
     place_audio,
     render_note,
     render_transcript,
+    speaker_ids_in_segments,
     unique_path,
     write_note,
 )
@@ -299,13 +302,17 @@ def _handle_file(
     engine = transcriber if transcriber is not None else build_transcriber(cfg)
     try:
         transcript = engine.transcribe(path)
+        # Diarize after STT. Does not replace Whisper. Audio stays local.
+        transcript = maybe_diarize(path, transcript, cfg)
         probe = probe_audio(path)
         recorded = recorded_at(path, probe)
         created = datetime.now().astimezone()
         title = recording_title(path, probe)
         duration = probe.duration_sec
         if duration is None and transcript.segments:
-            duration = transcript.segments[-1][1]
+            duration = transcript.segments[-1].end
+        speaker_ids = speaker_ids_in_segments(transcript.segments)
+        has_speakers = bool(speaker_ids)
         if cfg.copy_audio:
             copied = place_audio(path, cfg.audio_dir, recorded, digest)
             audio_field = audio_wikilink(cfg.vault_root, copied)
@@ -324,6 +331,8 @@ def _handle_file(
             runtime_sec=transcript.runtime_sec,
             title=title,
             transcript_body=render_transcript(transcript.text, transcript.segments),
+            speakers=has_speakers,
+            speaker_count=len(speaker_ids),
         )
         write_note(note_path, content)
         # Mark only after the note is in place. A crash here is recovered by
@@ -350,7 +359,17 @@ def _handle_file(
         f"wrote {note_path} model={transcript.model_name} "
         f"language={transcript.language} runtime={transcript.runtime_sec:.2f}s"
     )
+    if has_speakers:
+        message += f" speakers={len(speaker_ids)}"
     LOG.info(message)
+    # Name speakers before summarize so the summary sees real names.
+    if cfg.name_speakers_enabled and cfg.name_speakers_command and has_speakers:
+        try:
+            if name_speakers_note(note_path, cfg):
+                LOG.info("named speakers in %s", note_path.name)
+        except Exception as exc:
+            LOG.error("name-speakers failed for %s: %s", note_path.name, exc)
+            message += f" (name-speakers failed: {exc})"
     if cfg.summarize_enabled and cfg.summarize_command:
         try:
             summarize_note(note_path, cfg)

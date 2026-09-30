@@ -1,4 +1,4 @@
-"""memo-ingest setup | run | once | status | reprocess | summarize"""
+"""memo-ingest setup | run | once | status | reprocess | summarize | name-speakers"""
 
 from __future__ import annotations
 
@@ -17,11 +17,14 @@ from memo_ingest.config import (
     Config,
     default_config_path,
     default_log_file,
+    default_name_speakers_prompt_file,
     default_prompt_file,
     default_state_db,
     load_config,
     write_config,
 )
+from memo_ingest.diarize import ensure_diarize_models, models_dir_for, models_ready, sherpa_importable
+from memo_ingest.name_speakers import name_speakers_note, notes_needing_names
 from memo_ingest.discover import (
     choose_recordings,
     choose_vault,
@@ -83,6 +86,27 @@ def main(argv: list[str] | None = None) -> int:
     _add_config_arg(summarize)
     summarize.add_argument("--note", type=Path, default=None, help="one note; default is every raw note")
     summarize.set_defaults(func=cmd_summarize)
+
+    name_speakers = sub.add_parser(
+        "name-speakers",
+        help="map SPEAKER_XX to names via Grok Build (rewrites labels in the transcript body)",
+    )
+    _add_config_arg(name_speakers)
+    name_speakers.add_argument(
+        "--note",
+        type=Path,
+        default=None,
+        help="one note; default is every diarized note still labeled SPEAKER_XX",
+    )
+    name_speakers.set_defaults(func=cmd_name_speakers)
+
+    ensure_models = sub.add_parser(
+        "ensure-diarize-models",
+        help="download local sherpa-onnx diarization models into the cache",
+    )
+    _add_config_arg(ensure_models)
+    ensure_models.add_argument("--force", action="store_true", help="re-download even if present")
+    ensure_models.set_defaults(func=cmd_ensure_diarize_models)
 
     args = parser.parse_args(argv)
     try:
@@ -185,6 +209,8 @@ def cmd_status(args: argparse.Namespace) -> int:
     print(f"log:        {cfg.log_file}")
     print(f"backend:    {cfg.backend} model={cfg.model} language={cfg.language}")
     print(f"stability:  {cfg.stable_seconds:g}s unchanged, min {cfg.min_bytes} bytes, poll {cfg.poll_interval_sec}s")
+    print(f"diarize:    {'on' if cfg.diarize else 'off'} (fail_soft={cfg.diarize_fail_soft})")
+    print(f"name-spk:   {'on' if cfg.name_speakers_enabled else 'off'}")
     print(f"summarize:  {'on' if cfg.summarize_enabled else 'off'}")
     if not cfg.state_db.is_file():
         print("processed:  0 (no state database yet)")
@@ -257,6 +283,55 @@ def cmd_summarize(args: argparse.Namespace) -> int:
     return 1 if failed else 0
 
 
+
+def cmd_name_speakers(args: argparse.Namespace) -> int:
+    cfg = load_config(args.config)
+    configure_logging(cfg.log_file)
+    if args.note is not None:
+        notes = [args.note.expanduser()]
+    else:
+        notes = notes_needing_names(cfg.inbox_dir)
+    if not notes:
+        print("no diarized notes still labeled SPEAKER_XX")
+        return 0
+    failed = 0
+    for note in notes:
+        try:
+            changed = name_speakers_note(note, cfg)
+            if changed:
+                print(f"named speakers in {note}")
+            else:
+                print(f"skipped {note} (nothing to rename)")
+        except IngestError as exc:
+            print(f"{note}: {exc}", file=sys.stderr)
+            failed += 1
+    return 1 if failed else 0
+
+
+def cmd_ensure_diarize_models(args: argparse.Namespace) -> int:
+    cfg = None
+    try:
+        cfg = load_config(args.config)
+        models = models_dir_for(cfg)
+    except IngestError:
+        from memo_ingest.diarize import default_models_dir
+
+        models = default_models_dir()
+    if not sherpa_importable():
+        print(
+            "sherpa-onnx is not installed. Install with:\n"
+            '  cd ~/memo-ingest && .venv/bin/pip install -e ".[diarize]"',
+            file=sys.stderr,
+        )
+    path = ensure_diarize_models(models, force=args.force)
+    print(f"diarize models ready under {path}")
+    print(f"  segmentation: {path / 'sherpa-onnx-pyannote-segmentation-3-0' / 'model.onnx'}")
+    print(f"  embedding:    {path / 'wespeaker_en_voxceleb_resnet34_LM.onnx'}")
+    if cfg is not None and models_ready(models):
+        print("set whisper.diarize = true in config to use them on the next ingest")
+    return 0
+
+
 def _build_setup_config(args: argparse.Namespace, config_path: Path) -> Config:
     if args.recordings is not None:
         recordings = args.recordings.expanduser()
@@ -309,9 +384,16 @@ def _build_setup_config(args: argparse.Namespace, config_path: Path) -> Config:
         diarize=False,
         whisper_cpp_bin="whisper-cli",
         whisper_cpp_model="",
+        diarize_models_dir="",
+        diarize_threshold=0.5,
+        diarize_max_speakers=0,
+        diarize_fail_soft=True,
         summarize_enabled=False,
         summarize_command="",
         prompt_file=default_prompt_file(),
+        name_speakers_enabled=False,
+        name_speakers_command="",
+        name_speakers_prompt_file=default_name_speakers_prompt_file(),
         config_path=config_path,
     )
 

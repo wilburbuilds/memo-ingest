@@ -8,6 +8,7 @@ dependencies = []
 
 [project.optional-dependencies]
 mlx = ["mlx-whisper"]
+diarize = ["sherpa-onnx"]
 
 [project.scripts]
 memo-ingest = "memo_ingest.cli:main"

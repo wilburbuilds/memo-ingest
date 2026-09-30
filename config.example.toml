@@ -30,10 +30,19 @@ backend = "auto"
 model = "mlx-community/whisper-large-v3-turbo"
 # auto, or a language code such as en
 language = "auto"
-# Speaker diarization is not implemented. The flag is reserved.
+# Local sherpa-onnx diarization after Whisper. Off until models are installed.
 diarize = false
 whisper_cpp_bin = "whisper-cli"
 whisper_cpp_model = ""
+
+[diarize]
+# Empty models_dir means ~/.cache/memo-ingest/diarize
+models_dir = ""
+threshold = 0.5
+# 0 = unknown speaker count (clustering threshold decides)
+max_speakers = 0
+# If models or sherpa-onnx are missing, continue without speakers.
+fail_soft = true
 
 [summarize]
 enabled = false
@@ -41,3 +50,9 @@ enabled = false
 # Grok Build (cloud) on this Mac:
 command = "/Users/wilbur-macmini/memo-ingest/scripts/grok-summarize.sh"
 prompt_file = "prompts/summarize.md"
+
+[name_speakers]
+# Optional Grok Build pass (text only). Rewrites SPEAKER_XX labels in the body.
+enabled = false
+command = "/Users/wilbur-macmini/memo-ingest/scripts/grok-name-speakers.sh"
+prompt_file = "prompts/name-speakers.md"

@@ -22,9 +22,17 @@ from memo_ingest.errors import IngestError
 
 
 @dataclass(frozen=True)
+class Segment:
+    start: float
+    end: float
+    text: str
+    speaker_id: str | None = None
+
+
+@dataclass(frozen=True)
 class Transcript:
     text: str
-    segments: list[tuple[float, float, str]]
+    segments: list[Segment]
     language: str
     model_name: str
     runtime_sec: float
@@ -227,24 +235,22 @@ class WhisperCppTranscriber:
 
 def build_transcriber(cfg: Config):
     backend = resolve_backend(cfg)
-    if cfg.diarize:
-        # v1 keeps the flag so config does not have to change later.
-        # Diarization is intentionally not run.
-        print("speaker diarization is off in v1; continuing without speakers", flush=True)
     if backend == "mlx-whisper":
         return MlxWhisperTranscriber(cfg.model, cfg.language)
     return WhisperCppTranscriber(cfg.whisper_cpp_bin, cfg.whisper_cpp_model, cfg.language)
 
 
 def _from_whisper_dict(result: dict, model_name: str, runtime: float) -> Transcript:
-    segments: list[tuple[float, float, str]] = []
+    segments: list[Segment] = []
     for segment in result.get("segments") or []:
         try:
             start = float(segment.get("start", 0))
             end = float(segment.get("end", start))
         except (TypeError, ValueError):
             continue
-        segments.append((start, end, str(segment.get("text") or "")))
+        segments.append(
+            Segment(start=start, end=end, text=str(segment.get("text") or ""))
+        )
     language = str(result.get("language") or "unknown")
     text = str(result.get("text") or "")
     return Transcript(text=text, segments=segments, language=language, model_name=model_name, runtime_sec=runtime)
@@ -257,7 +263,7 @@ def _from_whisper_cpp(payload: dict, model_name: str, runtime: float) -> Transcr
     result = payload.get("result") or {}
     if isinstance(result, dict) and result.get("language"):
         language = str(result["language"])
-    segments: list[tuple[float, float, str]] = []
+    segments: list[Segment] = []
     chunks = payload.get("transcription") or []
     for chunk in chunks:
         offsets = chunk.get("offsets") or {}
@@ -266,6 +272,6 @@ def _from_whisper_cpp(payload: dict, model_name: str, runtime: float) -> Transcr
             end = float(offsets.get("to", 0)) / 1000.0
         except (TypeError, ValueError):
             start, end = 0.0, 0.0
-        segments.append((start, end, str(chunk.get("text") or "")))
-    text = " ".join(part[2].strip() for part in segments if part[2].strip())
+        segments.append(Segment(start=start, end=end, text=str(chunk.get("text") or "")))
+    text = " ".join(part.text.strip() for part in segments if part.text.strip())
     return Transcript(text=text, segments=segments, language=language, model_name=model_name, runtime_sec=runtime)

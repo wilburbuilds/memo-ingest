@@ -1,6 +1,6 @@
 # Notes for a future agent
 
-Read this before changing memo-ingest. The human-facing setup guide is `README.md`. This file is the operational picture as of 2026-09-23.
+Read this before changing memo-ingest. The human-facing setup guide is `README.md`. This file is the operational picture as of 2026-09-30.
 
 ## What this product is
 
@@ -43,11 +43,11 @@ A Homebrew Python upgrade changes the Cellar path. Full Disk Access must be gran
 - Copy audio into the vault. Do not hardlink it out of Voice Memos, and do not delete the original.
 - Summarize is a separate command (`memo-ingest summarize`) and is off. It may replace `## Summary` and `## Action items` and set `status: processed`. It must not change the transcript section. Prompt: `prompts/summarize.md`.
 - `diarize` is config-only. v1 does not diarize.
+- `clean_title` rejects Voice Memos auto stems (compact/dashed wall time plus an optional hex id), so the note heading falls back to `Voice memo {YYYY-MM-DD HH:MM}` and the basename uses `voice-memo`. Real human titles still pass through. Five older inbox notes still have the raw filename headings; do not rewrite their transcript bodies. Renaming them is a separate, explicit edit.
 - Tests: `python -m unittest discover -s tests -t .` from the repo, using the venv. `tests/test_live.py` runs real mlx-whisper and needs the model cache plus `say` and `ffmpeg`.
 
 ## Shortcomings
 
-- Titles are wrong for normal Voice Memos names. A file like `20250525 062225-112164E2.m4a` is treated as a human title, so the note is `# 20250525 062225-112164E2` and the filename contains that slug. The intended heading is `Voice memo 2025-05-25 06:22`, and the file should be `2025-05-25-0622-voice-memo.md`. The date parser in `memo_ingest/audio.py` already reads the timestamp. `clean_title` / `recording_title` should reject stems that are only a recording timestamp plus an id. Five notes already in the vault have the raw names. Do not rewrite their transcript bodies. Renaming them is a separate, explicit edit.
 - Summary and action items are empty. `status` stays `raw`.
 - No speaker diarization.
 - No chat UI. Query the notes from Obsidian or another tool pointed at the vault.

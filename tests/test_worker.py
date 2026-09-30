@@ -94,6 +94,18 @@ class WorkerTest(unittest.TestCase):
         self.assertEqual(len(list(self.cfg.inbox_dir.glob("*.md"))), 1)
         self.assertEqual(self.engine.calls, 1)
 
+    def test_auto_stem_with_hex_id_uses_voice_memo_title(self):
+        # AGENTS example shape: timestamp plus hex id must not become the note title.
+        self.write_audio("20250525 062225-112164E2.m4a", 20000)
+        self.tick()
+        done = self.tick(20)
+        self.assertEqual(done.processed, 1)
+        note = next(self.cfg.inbox_dir.glob("*.md"))
+        self.assertEqual(note.name, "2025-05-25-0622-voice-memo.md")
+        text = note.read_text(encoding="utf-8")
+        self.assertIn("# Voice memo 2025-05-25 06:22", text)
+        self.assertNotIn("# 20250525", text)
+
     def test_same_bytes_under_a_new_name_are_skipped(self):
         source = self.write_audio("20260923 155900.m4a", 20000)
         self.tick()

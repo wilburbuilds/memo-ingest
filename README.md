@@ -21,12 +21,12 @@ What works:
 - One note per recording, keyed by SHA-256, including after sleep or a crash between the note write and the index update.
 - Audio copied into the vault and wikilinked. The Voice Memos original stays where it is.
 - Segment timestamps, model name, language, and runtime in YAML frontmatter.
+- Note titles: Voice Memos auto filenames fall back to `Voice memo YYYY-MM-DD HH:MM` / `…-voice-memo.md`; real human titles are kept. (Five older inbox notes still have the raw names; renaming them is a separate edit.)
 - A separate summarize command, off until a local model command is configured.
 - Unit tests plus one live Whisper test.
 
 What is not done:
 
-- Note titles currently use the raw Voice Memos filename (`# 20250525 062225-112164E2`) instead of the date and time. See `AGENTS.md`.
 - Summary and action items stay empty. `status` stays `raw`.
 - No speaker names.
 - No chat app over the vault.
@@ -107,7 +107,7 @@ Logs: `~/Library/Logs/memo-ingest.log`. launchd stdout/stderr: `~/Library/Logs/m
 
 `{vault}/inbox/transcripts/2026-09-23-1559-voice-memo.md`
 
-The note has YAML frontmatter (`type: transcript`, `status: raw`), the transcript with segment timestamps, and empty `## Summary` and `## Action items` sections. The transcript is not edited later. A copied audio file is `{vault}/attachments/audio/YYYY/YYYY-MM-DD-HHmm.m4a`, wikilinked from the note. A real title from metadata is used when it is a human title. A plain Voice Memos filename is still being used as the title too; that is the known gap described above.
+The note has YAML frontmatter (`type: transcript`, `status: raw`), the transcript with segment timestamps, and empty `## Summary` and `## Action items` sections. The transcript is not edited later. A copied audio file is `{vault}/attachments/audio/YYYY/YYYY-MM-DD-HHmm.m4a`, wikilinked from the note. A real title from metadata is used when it is a human title. A plain Voice Memos auto filename is rejected, so the heading becomes `Voice memo YYYY-MM-DD HH:MM` and the basename uses `voice-memo`.
 
 `status: raw` means transcribed only. `status: processed` is set only by the optional summarize step.
 

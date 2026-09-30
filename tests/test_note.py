@@ -3,10 +3,17 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import mkdtemp
 
-from memo_ingest.audio import datetime_from_filename, sha256_file
+from memo_ingest.audio import (
+    Probe,
+    clean_title,
+    datetime_from_filename,
+    recording_title,
+    sha256_file,
+)
 from memo_ingest.config import load_config, write_config
 from memo_ingest.errors import IngestError
 from memo_ingest.note import (
+    note_basename,
     parse_frontmatter,
     render_note,
     splice_summary,
@@ -120,7 +127,53 @@ class NoteTest(unittest.TestCase):
         self.assertTrue(loaded.copy_audio)
         self.assertFalse(loaded.diarize)
 
+    def test_voice_memos_auto_stem_is_not_a_title(self):
+        # AGENTS.md example: compact wall time plus hex id must not become the heading.
+        stem = "20250525 062225-112164E2"
+        self.assertIsNone(clean_title(stem))
+        path = Path(stem + ".m4a")
+        self.assertIsNone(recording_title(path, Probe(None, None, None)))
+        recorded = datetime_from_filename(path.name)
+        self.assertIsNotNone(recorded)
+        assert recorded is not None
+        self.assertEqual(note_basename(recorded, None), "2025-05-25-0622-voice-memo.md")
+        note = render_note(
+            created=recorded,
+            recorded=recorded,
+            audio_field="[[attachments/audio/2025/2025-05-25-0622.m4a]]",
+            duration_sec=10,
+            size=1000,
+            sha256="ef" * 32,
+            model="mlx-whisper-test",
+            language="en",
+            runtime_sec=0.2,
+            title=None,
+            transcript_body="[00:00] Hello",
+        )
+        self.assertIn("# Voice memo 2025-05-25 06:22", note)
+        self.assertNotIn("# 20250525", note)
+
+    def test_human_titles_still_pass_clean_title(self):
+        self.assertEqual(clean_title("Dentist appointment"), "Dentist appointment")
+        self.assertEqual(
+            recording_title(
+                Path("20250525 062225-112164E2.m4a"),
+                Probe(None, "Dentist appointment", None),
+            ),
+            "Dentist appointment",
+        )
+        self.assertIsNone(clean_title("New Recording"))
+        self.assertIsNone(clean_title("Voice Memo 3"))
+        self.assertIsNone(clean_title("20260923 155900"))
+        recorded = datetime_from_filename("20260923 155900.m4a")
+        assert recorded is not None
+        self.assertEqual(
+            note_basename(recorded, "Dentist appointment"),
+            "2026-09-23-1559-dentist-appointment.md",
+        )
+
     def test_sha256_matches_bytes(self):
+
         folder = Path(mkdtemp())
         path = folder / "a.m4a"
         path.write_bytes(b"abc" * 100)

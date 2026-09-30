@@ -26,6 +26,17 @@ _UUID = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
     re.IGNORECASE,
 )
+# Voice Memos default names: compact or dashed wall time, optional hex id.
+# Example: "20250525 062225-112164E2"
+_AUTO_RECORDING_STEM = re.compile(
+    r"^(?:"
+    r"20\d{6}[ T_\-]\d{6}"
+    r"|"
+    r"20\d{2}-\d{2}-\d{2}[ T_\-]\d{2}[:\-.]?\d{2}(?:[:\-.]?\d{2})?"
+    r")"
+    r"(?:[-_.][0-9A-Fa-f]{4,16})?$",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -104,6 +115,8 @@ def clean_title(title: str | None) -> str | None:
     if _UUID.fullmatch(text):
         return None
     if re.fullmatch(r"[\d\s._:\-]+", text):
+        return None
+    if _AUTO_RECORDING_STEM.fullmatch(text):
         return None
     return text
 

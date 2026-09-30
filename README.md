@@ -22,7 +22,7 @@ What works:
 - Audio copied into the vault and wikilinked. The Voice Memos original stays where it is.
 - Segment timestamps, model name, language, and runtime in YAML frontmatter.
 - Note titles: Voice Memos auto filenames fall back to `Voice memo YYYY-MM-DD HH:MM` / `…-voice-memo.md`; real human titles are kept. (Five older inbox notes still have the raw names; renaming them is a separate edit.)
-- A separate summarize command, off until a local model command is configured.
+- A separate summarize command, off until a summarize command is configured (Grok Build preferred on this Mini).
 - Unit tests plus one live Whisper test.
 
 What is not done:
@@ -150,12 +150,12 @@ That drops the hash, leaves the old note where it is, and writes a new note. `re
 
 ## Summaries
 
-Summarizing is a separate command so it can be retried without running Whisper again. It is off until you set a local command. The prompt is `prompts/summarize.md` (edit that file; no code change).
+Summarizing is a separate command so it can be retried without running Whisper again. It is off until you set a command. Preferred on this Mac: `scripts/grok-summarize.sh` (Grok Build CLI, cloud). Local Ollama works but is not recommended on the Mini. The prompt is `prompts/summarize.md` (edit that file; no code change).
 
 ```toml
 [summarize]
 enabled = true
-command = "ollama run llama3.2"
+command = "/Users/you/memo-ingest/scripts/grok-summarize.sh"
 prompt_file = "/Users/you/memo-ingest/prompts/summarize.md"
 ```
 

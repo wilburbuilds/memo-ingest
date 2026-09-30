@@ -205,6 +205,8 @@ Summarizing is a separate command so it can be retried without running Whisper a
 enabled = true
 command = "/Users/you/memo-ingest/scripts/grok-summarize.sh"
 prompt_file = "/Users/you/memo-ingest/prompts/summarize.md"
+# Local macOS notification after a successful summarize (default true).
+notify = true
 ```
 
 The command receives the prompt plus the transcript on stdin. Stdout must contain `## Summary` and `## Action items`. Then:
@@ -213,7 +215,7 @@ The command receives the prompt plus the transcript on stdin. Stdout must contai
 ~/memo-ingest/.venv/bin/memo-ingest summarize
 ```
 
-That fills those two sections and sets `status: processed`.
+That fills those two sections and sets `status: processed`. On success it also shows a local macOS notification ("Memo summarized") and appends one private JSON line to `~/.local/share/memo-ingest/summarize-events.jsonl` for Grok Bot sweeps (`ts`, `note_path`, `status`). Set `notify = false` under `[summarize]` to silence the banner; the event marker still writes. Notification or marker failures never undo the note write.
 
 ## Asking questions about the notes
 

@@ -65,6 +65,7 @@ class Config:
     summarize_enabled: bool
     summarize_command: str
     prompt_file: Path
+    summarize_notify: bool
     name_speakers_enabled: bool
     name_speakers_command: str
     name_speakers_prompt_file: Path
@@ -155,6 +156,7 @@ def load_config(path: Path | None = None) -> Config:
         summarize_enabled=bool(summarize.get("enabled", False)),
         summarize_command=str(summarize.get("command", "")).strip(),
         prompt_file=_as_path(summarize.get("prompt_file"), default_prompt_file()),
+        summarize_notify=bool(summarize.get("notify", True)),
         name_speakers_enabled=bool(name_speakers.get("enabled", False)),
         name_speakers_command=str(name_speakers.get("command", "")).strip(),
         name_speakers_prompt_file=_as_path(
@@ -221,6 +223,8 @@ fail_soft = {_toml_bool(cfg.diarize_fail_soft)}
 enabled = {_toml_bool(cfg.summarize_enabled)}
 command = {_toml_str(cfg.summarize_command)}
 prompt_file = {_toml_str(prompt)}
+# Local macOS notification after a successful summarize (CLI or worker).
+notify = {_toml_bool(cfg.summarize_notify)}
 
 [name_speakers]
 # Optional Grok Build pass: rewrite SPEAKER_XX → names (text only; no audio upload).

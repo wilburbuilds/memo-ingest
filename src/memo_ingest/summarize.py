@@ -9,6 +9,7 @@ from pathlib import Path
 from memo_ingest.config import Config
 from memo_ingest.errors import IngestError
 from memo_ingest.note import parse_frontmatter, splice_summary, transcript_section, write_note
+from memo_ingest.notify import notify_summarize_complete
 
 
 def summarize_note(note_path: Path, cfg: Config) -> None:
@@ -53,6 +54,12 @@ def summarize_note(note_path: Path, cfg: Config) -> None:
     if transcript_section(updated) != transcript:
         raise IngestError("summarize would have changed the transcript; note left untouched")
     write_note(note_path, updated)
+    # Notification + private event marker. Fail-soft; never undo the note write.
+    notify_summarize_complete(
+        note_path,
+        notify=cfg.summarize_notify,
+        note_text=updated,
+    )
 
 
 def raw_notes(inbox: Path) -> list[Path]:

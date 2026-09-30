@@ -242,14 +242,26 @@ class WorkerTest(unittest.TestCase):
             self.cfg,
             summarize_enabled=True,
             summarize_command=str(script),
+            summarize_notify=True,
         )
-        summarize_note(note, cfg)
+        events = self.tmp / "summarize-events.jsonl"
+        from unittest.mock import patch
+
+        with patch(
+            "memo_ingest.notify.show_macos_notification"
+        ) as banner, patch(
+            "memo_ingest.notify.default_summarize_events_path",
+            return_value=events,
+        ):
+            summarize_note(note, cfg)
+            banner.assert_called_once()
         after = note.read_text(encoding="utf-8")
         self.assertIn("status: processed", after)
         self.assertIn("- A short memo.", after)
         self.assertIn("- [ ] File it", after)
         self.assertEqual(transcript_section(before), transcript_section(after))
         self.assertEqual(self.engine.calls, 1)
+        self.assertTrue(events.is_file())
 
 
 if __name__ == "__main__":

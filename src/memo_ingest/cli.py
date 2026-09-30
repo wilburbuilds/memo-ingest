@@ -391,6 +391,7 @@ def _build_setup_config(args: argparse.Namespace, config_path: Path) -> Config:
         summarize_enabled=False,
         summarize_command="",
         prompt_file=default_prompt_file(),
+        summarize_notify=True,
         name_speakers_enabled=False,
         name_speakers_command="",
         name_speakers_prompt_file=default_name_speakers_prompt_file(),

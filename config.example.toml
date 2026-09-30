@@ -50,6 +50,8 @@ enabled = false
 # Grok Build (cloud) on this Mac:
 command = "/Users/wilbur-macmini/memo-ingest/scripts/grok-summarize.sh"
 prompt_file = "prompts/summarize.md"
+# Local macOS banner after a successful summarize (CLI or worker auto). Default true.
+notify = true
 
 [name_speakers]
 # Optional Grok Build pass (text only). Rewrites SPEAKER_XX labels in the body.

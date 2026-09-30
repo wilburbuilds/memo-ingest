@@ -40,6 +40,7 @@ def make_config(root: Path | None = None) -> tuple[Path, Config]:
         summarize_enabled=False,
         summarize_command="",
         prompt_file=prompt,
+        summarize_notify=True,
         name_speakers_enabled=False,
         name_speakers_command="",
         name_speakers_prompt_file=tmp / "prompts" / "name-speakers.md",

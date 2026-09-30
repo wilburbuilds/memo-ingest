@@ -20,7 +20,7 @@ There is no iOS app, no Shortcut, and no cloud speech API. Do not add one as a f
 - LaunchAgent label: `com.local.memo-ingest`
 - Plist: `~/Library/LaunchAgents/com.local.memo-ingest.plist`
 - It runs `~/memo-ingest/.venv/bin/memo-ingest once` every 45 seconds. One flock at `~/.local/share/memo-ingest/worker.lock`. A long transcription is not started twice.
-- Clickable control: `~/Applications/Memo Ingest.app` (source `macos/`, rebuild with `macos/build-app.sh`). The app only loads and unloads the agent. It does not transcribe. Closing the window leaves the agent running.
+- Clickable control: `~/Applications/Memo Ingest.app` (source `macos/`, rebuild with `macos/build-app.sh`). The app loads and unloads the agent and can toggle diarize / name-speakers / summarize in `~/.config/memo-ingest/config.toml`. It does not transcribe. Closing the window leaves the agent running.
 - Recordings directory that exists: `~/Library/Group Containers/group.com.apple.VoiceMemos.shared/Recordings`. The two older Application Support paths are absent. The folder is not readable without Full Disk Access.
 
 ## Full Disk Access

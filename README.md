@@ -81,7 +81,7 @@ Setup will not create a vault.
 
 ## Start and stop
 
-Double-click **Memo Ingest** in `~/Applications`. That starts the background checker. Closing the window leaves it running, including after a reboot. **Stop** in the window turns it off. Rebuild the app with `macos/build-app.sh` after you change the Swift source.
+Double-click **Memo Ingest** in `~/Applications`. That starts the background checker. Closing the window leaves it running, including after a reboot. **Stop** in the window turns it off. Checkboxes toggle **Diarize** (`[whisper] diarize`), **Name speakers** (`[name_speakers] enabled`), and **Summarize** (`[summarize] enabled`) in `~/.config/memo-ingest/config.toml`; the status area shows the same on/off lines as `memo-ingest status`. Rebuild the app with `macos/build-app.sh` after you change the Swift source.
 
 The command is `~/memo-ingest/.venv/bin/memo-ingest`. launchd is the normal runner. `run` is the same loop in the foreground.
 

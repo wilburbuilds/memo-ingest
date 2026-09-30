@@ -36,10 +36,8 @@ whisper_cpp_bin = "whisper-cli"
 whisper_cpp_model = ""
 
 [summarize]
-# Separate from speech-to-text. Leave false until you set a local command.
 enabled = false
-# Shell command. The prompt file plus the transcript are written to stdin.
-# Stdout must contain the headings "## Summary" and "## Action items".
-command = ""
-# Empty means prompts/summarize.md in this repo.
-prompt_file = ""
+# Local (not recommended on Mini): command = "ollama run qwen3:8b"
+# Grok Build (cloud) on this Mac:
+command = "/Users/wilbur-macmini/memo-ingest/scripts/grok-summarize.sh"
+prompt_file = "prompts/summarize.md"
